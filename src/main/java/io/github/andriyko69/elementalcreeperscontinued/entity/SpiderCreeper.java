@@ -1,0 +1,160 @@
+package io.github.andriyko69.elementalcreeperscontinued.entity;
+
+import io.github.andriyko69.elementalcreeperscontinued.Config;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.entity.ai.navigation.WallClimberNavigation;
+import net.minecraft.world.entity.monster.Creeper;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.List;
+
+public class SpiderCreeper extends ElementalCreeper {
+    private static final EntityDataAccessor<Byte> DATA_FLAGS_ID = SynchedEntityData.defineId(SpiderCreeper.class,
+            EntityDataSerializers.BYTE);
+
+    public SpiderCreeper(EntityType<? extends Creeper> type, Level level) {
+        super(type, level);
+
+    }
+
+    @Override
+    public void creeperEffect() {
+        double radius = Config.spiderCreeperExplosionRadius;
+        if (this.isPowered()) {
+            radius *= 1.5;
+        }
+
+        double rSqr = Math.pow(radius, 2);
+
+        for (int x = (int) -radius - 1; x <= radius; x++)
+            for (int y = (int) -radius - 1; y <= radius; y++)
+                for (int z = (int) -radius - 1; z <= radius; z++) {
+                    double distSqr = Math.pow(x, 2) + Math.pow(y, 2) + Math.pow(z, 2);
+                    BlockPos blockPos = new BlockPos((int) this.getX() + x, (int) this.getY() + y,
+                            (int) this.getZ() + z);
+                    if (this.level().getBlockState(blockPos).isAir() && distSqr <= rSqr
+                            && this.level().random.nextFloat() < 0.05f) {
+                        this.level().setBlockAndUpdate(blockPos, Blocks.COBWEB.defaultBlockState());
+                    }
+                }
+
+        List<LivingEntity> entities = this.level().getEntitiesOfClass(LivingEntity.class,
+                AABB.ofSize(this.position(), radius, radius, radius));
+
+        double poisonTime = Config.spiderCreeperPoisonTimeMedium;
+        switch (this.level().getDifficulty()) {
+            case EASY:
+                poisonTime *= 0.66;
+                break;
+            case HARD:
+                poisonTime *= 1.5;
+                break;
+            case PEACEFUL:
+                poisonTime = 0;
+                break;
+            case NORMAL:
+            default:
+                break;
+        }
+
+        if (radius > 0) {
+            for (LivingEntity entity : entities) {
+                if (entity == this) {
+                    continue;
+                }
+
+                double strength = Math.min(0.5, 1 - (entity.distanceTo(this) / radius));
+                if (strength <= 1) {
+                    entity.addEffect(new MobEffectInstance(MobEffects.POISON, (int) (60 * poisonTime * strength), 1),
+                            this);
+                }
+            }
+        }
+
+        handleNetworkedExplosionEffects(radius, SoundEvents.SPIDER_DEATH);
+    }
+
+    @Override
+    protected @NotNull PathNavigation createNavigation(@NotNull Level level) {
+        return new WallClimberNavigation(this, level);
+    }
+
+    @Override
+    protected void defineSynchedData(SynchedEntityData.@NotNull Builder p_332186_) {
+        super.defineSynchedData(p_332186_);
+        p_332186_.define(DATA_FLAGS_ID, (byte) 0);
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        Level level = this.level();
+        if (!level.isClientSide) {
+            this.setClimbing(this.horizontalCollision);
+        }
+
+    }
+
+    @Override
+    protected SoundEvent getAmbientSound() {
+        return SoundEvents.SPIDER_AMBIENT;
+    }
+
+    @Override
+    protected @NotNull SoundEvent getHurtSound(@NotNull DamageSource damageSource) {
+        return SoundEvents.CREEPER_HURT;
+    }
+
+    @Override
+    protected @NotNull SoundEvent getDeathSound() {
+        return SoundEvents.SPIDER_DEATH;
+    }
+
+    @Override
+    protected void playStepSound(@NotNull BlockPos blockPos, @NotNull BlockState blockState) {
+        this.playSound(SoundEvents.SPIDER_STEP, 0.15F, 1.0F);
+    }
+
+    @Override
+    public boolean onClimbable() {
+        return this.isClimbing();
+    }
+
+    @Override
+    public void makeStuckInBlock(BlockState blockState, @NotNull Vec3 motionMultiplier) {
+        if (!blockState.is(Blocks.COBWEB)) {
+            super.makeStuckInBlock(blockState, motionMultiplier);
+        }
+    }
+
+    public boolean isClimbing() {
+        return (this.entityData.get(DATA_FLAGS_ID) & 1) != 0;
+    }
+
+    public void setClimbing(boolean p_33820_) {
+        byte b0 = this.entityData.get(DATA_FLAGS_ID);
+        if (p_33820_) {
+            b0 = (byte) (b0 | 1);
+        } else {
+            b0 = (byte) (b0 & -2);
+        }
+
+        this.entityData.set(DATA_FLAGS_ID, b0);
+    }
+}

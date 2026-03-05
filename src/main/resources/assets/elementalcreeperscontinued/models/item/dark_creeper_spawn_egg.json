@@ -1,0 +1,6 @@
+{
+  "parent": "item/generated",
+  "textures": {
+    "layer0": "elementalcreeperscontinued:item/dark_creeper_spawn_egg"
+  }
+}

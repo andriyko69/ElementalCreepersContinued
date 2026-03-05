@@ -1,0 +1,11 @@
+{
+	"type": "neoforge:add_spawns",
+	"biomes": "#minecraft:has_structure/igloo",
+	"spawners":
+	{
+		"type": "elementalcreeperscontinued:ice_creeper",
+		"weight": 120,
+		"minCount": 1,
+		"maxCount": 1
+	}
+}
