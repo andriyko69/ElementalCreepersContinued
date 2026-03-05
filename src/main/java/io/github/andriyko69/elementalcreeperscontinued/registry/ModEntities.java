@@ -83,6 +83,15 @@ public class ModEntities {
                     .sized(0.6f, 1.7f).clientTrackingRange(10)
                     .build("friendly_creeper")
     );
+    public static final DeferredItem<DeferredSpawnEggItem> FRIENDLY_CREEPER_SPAWN_EGG = ITEMS.registerItem(
+            "friendly_creeper_spawn_egg",
+            props -> new DeferredSpawnEggItem(
+                    FRIENDLY_CREEPER,
+                    new Color(0, 255, 0).getRGB() & 0xFFFFFF,
+                    new Color(0, 128, 0).getRGB() & 0xFFFFFF,
+                    props
+            )
+    );
 
     public static <T extends ElementalCreeper> DeferredHolder<EntityType<?>, EntityType<T>> registerCreeper(
             EntityFactory<T> creeperFactory,
@@ -123,6 +132,7 @@ public class ModEntities {
     }
 
     public static void register(IEventBus modEventBus) {
+        EGG_ITEMS.add(FRIENDLY_CREEPER_SPAWN_EGG);
         ENTITIES.register(modEventBus);
         ITEMS.register(modEventBus);
     }
