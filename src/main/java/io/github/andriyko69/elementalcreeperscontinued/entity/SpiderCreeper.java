@@ -86,7 +86,6 @@ public class SpiderCreeper extends ElementalCreeper {
                 }
             }
         }
-
         handleNetworkedExplosionEffects(radius, SoundEvents.SPIDER_DEATH);
     }
 

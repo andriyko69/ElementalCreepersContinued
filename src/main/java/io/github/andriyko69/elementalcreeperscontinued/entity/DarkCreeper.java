@@ -85,22 +85,21 @@ public class DarkCreeper extends ElementalCreeper {
         handleNetworkedExplosionEffects(radius, SoundEvents.CANDLE_EXTINGUISH);
     }
 
-    private static void addBlockDrops(ObjectArrayList<Pair<ItemStack, BlockPos>> p_46068_, ItemStack p_46069_,
+    private static void addBlockDrops(ObjectArrayList<Pair<ItemStack, BlockPos>> pairs, ItemStack itemStack,
                                       BlockPos p_46070_) {
-        int i = p_46068_.size();
+        int i = pairs.size();
 
         for (int j = 0; j < i; ++j) {
-            Pair<ItemStack, BlockPos> pair = p_46068_.get(j);
+            Pair<ItemStack, BlockPos> pair = pairs.get(j);
             ItemStack itemstack = pair.getFirst();
-            if (ItemEntity.areMergable(itemstack, p_46069_)) {
-                ItemStack itemstack1 = ItemEntity.merge(itemstack, p_46069_, 16);
-                p_46068_.set(j, Pair.of(itemstack1, pair.getSecond()));
-                if (p_46069_.isEmpty()) {
+            if (ItemEntity.areMergable(itemstack, itemStack)) {
+                ItemStack itemStack1 = ItemEntity.merge(itemstack, itemStack, 16);
+                pairs.set(j, Pair.of(itemStack1, pair.getSecond()));
+                if (itemStack.isEmpty()) {
                     return;
                 }
             }
         }
-
-        p_46068_.add(Pair.of(p_46069_, p_46070_));
+        pairs.add(Pair.of(itemStack, p_46070_));
     }
 }
