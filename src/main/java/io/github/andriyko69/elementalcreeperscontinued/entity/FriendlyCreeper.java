@@ -1,5 +1,6 @@
 package io.github.andriyko69.elementalcreeperscontinued.entity;
 
+import io.github.andriyko69.elementalcreeperscontinued.Config;
 import io.github.andriyko69.elementalcreeperscontinued.ai.FriendlyCreeperSwellGoal;
 import io.github.andriyko69.elementalcreeperscontinued.misc.EntityOnlyExplosion;
 import io.github.andriyko69.elementalcreeperscontinued.registry.ModEntities;
@@ -56,11 +57,16 @@ public class FriendlyCreeper extends TamableAnimal implements NeutralMob, Powera
             EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> DATA_IS_IGNITED = SynchedEntityData.defineId(FriendlyCreeper.class,
             EntityDataSerializers.BOOLEAN);
+    // Must not depend on local config: clients skip metadata equal to the default, so it has to match on both sides.
+    private static final int DEFAULT_SYNCED_FUSE_TIME = 30;
+    private static final int DEFAULT_SYNCED_COOLDOWN_TIME = 80;
+    private static final EntityDataAccessor<Integer> DATA_FUSE_TIME = SynchedEntityData.defineId(FriendlyCreeper.class,
+            EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> DATA_COOLDOWN_TIME = SynchedEntityData
+            .defineId(FriendlyCreeper.class, EntityDataSerializers.INT);
     private int oldSwell;
     private int swell;
-    private int maxSwell = 30;
     private int cooldown;
-    private int explosionRadius = 3;
 
     @Nullable
     private UUID persistentAngerTarget;
@@ -68,6 +74,7 @@ public class FriendlyCreeper extends TamableAnimal implements NeutralMob, Powera
     public FriendlyCreeper(EntityType<? extends FriendlyCreeper> entityType, Level level) {
         super(entityType, level);
         this.setTame(false, false);
+        this.syncTimings();
     }
 
     @Override
@@ -102,6 +109,8 @@ public class FriendlyCreeper extends TamableAnimal implements NeutralMob, Powera
         builder.define(DATA_SWELL_DIR, -1);
         builder.define(DATA_IS_POWERED, false);
         builder.define(DATA_IS_IGNITED, false);
+        builder.define(DATA_FUSE_TIME, DEFAULT_SYNCED_FUSE_TIME);
+        builder.define(DATA_COOLDOWN_TIME, DEFAULT_SYNCED_COOLDOWN_TIME);
     }
 
     public void addAdditionalSaveData(@NotNull CompoundTag compoundTag) {
@@ -111,8 +120,9 @@ public class FriendlyCreeper extends TamableAnimal implements NeutralMob, Powera
             compoundTag.putBoolean("powered", true);
         }
 
-        compoundTag.putShort("Fuse", (short) this.maxSwell);
-        compoundTag.putByte("ExplosionRadius", (byte) this.explosionRadius);
+        // Legacy keys are written for rollback only; config values always win on load.
+        compoundTag.putShort("Fuse", (short) this.getFuseTime());
+        compoundTag.putByte("ExplosionRadius", (byte) Math.round(Config.friendlyCreeperExplosionRadius));
         compoundTag.putBoolean("ignited", this.isIgnited());
     }
 
@@ -120,20 +130,18 @@ public class FriendlyCreeper extends TamableAnimal implements NeutralMob, Powera
         super.readAdditionalSaveData(compoundTag);
         this.readPersistentAngerSaveData(this.level(), compoundTag);
         this.entityData.set(DATA_IS_POWERED, compoundTag.getBoolean("powered"));
-        if (compoundTag.contains("Fuse", 99)) {
-            this.maxSwell = compoundTag.getShort("Fuse");
-        }
-
-        if (compoundTag.contains("ExplosionRadius", 99)) {
-            this.explosionRadius = compoundTag.getByte("ExplosionRadius");
-        }
-
         if (compoundTag.getBoolean("ignited")) {
             this.ignite();
         }
+
+        this.syncTimings();
     }
 
     public void tick() {
+        if (!this.level().isClientSide()) {
+            this.syncTimings();
+        }
+
         if (this.isAlive()) {
             this.oldSwell = this.swell;
             if (this.cooldown > 0) {
@@ -155,9 +163,9 @@ public class FriendlyCreeper extends TamableAnimal implements NeutralMob, Powera
                     this.swell = 0;
                 }
 
-                if (this.swell >= this.maxSwell) {
+                if (this.swell >= this.getFuseTime()) {
                     this.swell = 0;
-                    this.cooldown = 80;
+                    this.cooldown = this.entityData.get(DATA_COOLDOWN_TIME);
                     this.setSwellDir(-1);
                     this.explodeCreeper();
                 }
@@ -167,6 +175,29 @@ public class FriendlyCreeper extends TamableAnimal implements NeutralMob, Powera
         super.tick();
     }
 
+    private void syncTimings() {
+        if (this.level().isClientSide()) {
+            return;
+        }
+
+        if (this.getFuseTime() != Config.friendlyCreeperFuseTime) {
+            this.entityData.set(DATA_FUSE_TIME, Config.friendlyCreeperFuseTime);
+        }
+
+        if (this.entityData.get(DATA_COOLDOWN_TIME) != Config.friendlyCreeperCooldown) {
+            this.entityData.set(DATA_COOLDOWN_TIME, Config.friendlyCreeperCooldown);
+        }
+    }
+
+    private int getFuseTime() {
+        return this.entityData.get(DATA_FUSE_TIME);
+    }
+
+    @Override
+    public boolean removeWhenFarAway(double distanceToClosestPlayer) {
+        return !this.isTame();
+    }
+
     public int getMaxFallDistance() {
         return this.getTarget() == null ? 3 : 3 + (int) (this.getHealth() - 1.0F);
     }
@@ -174,8 +205,9 @@ public class FriendlyCreeper extends TamableAnimal implements NeutralMob, Powera
     public boolean causeFallDamage(float p_149687_, float p_149688_, @NotNull DamageSource damageSource) {
         boolean flag = super.causeFallDamage(p_149687_, p_149688_, damageSource);
         this.swell += (int) (p_149687_ * 1.5F);
-        if (this.swell > this.maxSwell - 5) {
-            this.swell = this.maxSwell - 5;
+        int maxFallSwell = Math.max(0, this.getFuseTime() - 5);
+        if (this.swell > maxFallSwell) {
+            this.swell = maxFallSwell;
         }
 
         return flag;
@@ -194,7 +226,7 @@ public class FriendlyCreeper extends TamableAnimal implements NeutralMob, Powera
     }
 
     public float getSwelling(float p_32321_) {
-        return Mth.lerp(p_32321_, (float) this.oldSwell, (float) this.swell) / (float) (this.maxSwell - 2);
+        return Mth.lerp(p_32321_, (float) this.oldSwell, (float) this.swell) / (float) (this.getFuseTime() - 2);
     }
 
     public int getSwellDir() {
@@ -213,7 +245,7 @@ public class FriendlyCreeper extends TamableAnimal implements NeutralMob, Powera
     private void explodeCreeper() {
         Level level = this.level();
         if (!level.isClientSide()) {
-            double radius = this.explosionRadius;
+            double radius = Config.friendlyCreeperExplosionRadius;
             if (this.isPowered()) {
                 radius *= 1.5d;
             }
@@ -309,7 +341,7 @@ public class FriendlyCreeper extends TamableAnimal implements NeutralMob, Powera
             return flag ? InteractionResult.CONSUME : InteractionResult.PASS;
         } else if (this.isTame()) {
             if (this.isFood(itemstack) && this.getHealth() < this.getMaxHealth()) {
-                this.heal(10);
+                this.heal(Config.friendlyCreeperHealAmount);
                 if (!p_30412_.getAbilities().instabuild) {
                     itemstack.shrink(1);
                 }

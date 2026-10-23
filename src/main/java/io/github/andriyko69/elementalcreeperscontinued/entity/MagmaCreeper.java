@@ -19,7 +19,7 @@ public class MagmaCreeper extends ElementalCreeper {
     public void creeperEffect() {
         FluidState flowingState = Fluids.FLOWING_LAVA.getFlowing(4, false);
 
-        double radius = Config.waterCreeperExplosionRadius;
+        double radius = Config.magmaCreeperExplosionRadius;
         if (this.isPowered()) {
             radius *= 1.5;
         }

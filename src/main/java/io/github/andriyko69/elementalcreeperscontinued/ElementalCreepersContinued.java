@@ -12,6 +12,8 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.loading.FMLConfig;
+import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent;
 
 import java.util.function.Supplier;
@@ -22,6 +24,11 @@ public class ElementalCreepersContinued {
     public static final String MOD_ID = "elementalcreeperscontinued";
 
     public ElementalCreepersContinued(IEventBus modEventBus, ModContainer modContainer) {
+        String commonConfigName = MOD_ID + "-common.toml";
+        Config.migrateLegacyKeys(
+                FMLPaths.CONFIGDIR.get().resolve(commonConfigName),
+                FMLPaths.GAMEDIR.get().resolve(FMLConfig.defaultConfigPath()).resolve(commonConfigName)
+        );
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
 
         ModEntities.register(modEventBus);
